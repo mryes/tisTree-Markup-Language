@@ -1,0 +1,2 @@
+nimrod c -p:./src/ -o:bin/$1 --nimcache:./tests/bin/nimcache tests/$1.nim
+./tests/bin/$1

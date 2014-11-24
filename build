@@ -1,0 +1,1 @@
+nimrod c -o:../bin/tml --nimcache:./bin/nimcache src/tml.nim

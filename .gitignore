@@ -1,0 +1,7 @@
+examples.txt
+old_sample.txt
+*.html
+tml.sublime-project
+tml.sublime-workspace
+bin/*
+tests/bin/*

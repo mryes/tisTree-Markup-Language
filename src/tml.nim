@@ -1,8 +1,8 @@
 import os, xmltree, htmlparser, sequtils, streams, strutils, strtabs, algorithm
 
+
+
 const DIV_STYLE_DEFAULT = "position:absolute;left:$1;top:$2;"
-
-
 
 proc parseHtml*(s: string): PXmlNode =
   parseHtml(newStringStream(s))
@@ -32,7 +32,14 @@ proc isPositioned(tag: PXmlNode): bool =
   tag.attrExists("x") or tag.attrExists("y")
 
 proc setFont(tag: PXmlNode): PXmlNode =
-  <>font(face=tag.attr("font"), newText(tag.innerText)) 
+  if not tag.attrExists("font"): return newText(tag.innerText)
+  let fontAttr = tag.attr("font").split(' ')
+  var font = newElement("font")
+  font.attrs = newStringTable()
+  font.attrs["face"] = fontAttr[0]
+  if fontAttr.len > 1: font.attrs["size"] = fontAttr[1]
+  font.add(newText(tag.innerText))
+  result = font
 
 proc makeTable(content: PXmlNode,
                border: string = "0",
@@ -42,30 +49,33 @@ proc makeTable(content: PXmlNode,
   <>table(border=border, cellpadding=cellpadding, 
           bgcolor=bgcolor, width=width, content)
 
+proc getGifTransformationAttrs*(tag: PXmlNode): seq[tuple[key, value: string]] =
+  const transformationAttrs = ["scale", "crop"]
+  result = @[] 
+  for k, v in tag.attrs.pairs:
+    if k in transformationAttrs: result.add((k, v)) 
+
+proc makeGifFilename*(gifTag: PXmlNode): string = 
+  result = ""
+  result.add(gifTag.attr("name"))
+  for a in getGifTransformationAttrs(gifTag):
+    result.add("-" & a.key & a.value)
+  result.add(".gif")
+
 
 
 proc convertTagGif*(tag: PXmlNode): PXmlNode {.procvar.} =
-  if tag.attrsLen == 0:
-    result = <>img()
-  else:
-    result = (<>img(src=tag.attr("name") & ".gif")) 
+  if tag.attrsLen == 0: return <>img()
+  result = <>img(src=makeGifFilename(tag))
   if tag.isPositioned(): 
     result.wrapInTag(makeDivFromLocation(tag.attr("x"), tag.attr("y")))
 
 proc convertTagDlg*(tag: PXmlNode): PXmlNode {.procvar.} =
-  if tag.innerText == "":
-    result = newText("")
-  else:
-    let centeredTR = [<>center(), <>td(), <>tr()]
-    var tableContent : PXmlNode
-    if tag.attrExists("font"):
-      tableContent = multiWrap(setFont(tag), centeredTR)
-    else: 
-      tableContent = multiWrap(newText(tag.innerText), centeredTR) 
-    var table = makeTable(tableContent)
-    if tag.isPositioned(): 
-      table.wrapInTag(makeDivFromLocation(tag.attr("x"), tag.attr("y")))
-    result = table
+  if tag.innerText == "": return newText("")
+  let centeredTR = [<>center(), <>td(), <>tr()]
+  result = makeTable(multiWrap(setFont(tag), centeredTR))
+  if tag.isPositioned(): 
+    result.wrapInTag(makeDivFromLocation(tag.attr("x"), tag.attr("y")))
 
 
 

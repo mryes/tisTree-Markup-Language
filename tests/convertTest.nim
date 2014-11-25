@@ -47,6 +47,15 @@ convTest "convert gif with position", convertTagGif,
   </div>
   """
 
+convTest "convert gif with scale", convertTagGif,
+  """
+  <gif name="source" x="10" y="20" scale="2" />
+
+  <div style="position:absolute;left:10;top:20;">
+    <img src="source-scale2.gif" />
+  </div>
+  """
+
 test "convert empty dlg to nothing":
   let dlgHtml = <>dlg(newText(""))
   check ($convertTagDlg(dlgHtml) == "")
@@ -75,7 +84,7 @@ convTest "convert dlg with position", convertTagDlg,
   </div> 
   """
 
-convTest "convert dlg with font", convertTagDlg,
+convTest "convert dlg with font face", convertTagDlg,
   """
   <dlg font="arial">Hello!</dlg>
 
@@ -84,3 +93,23 @@ convTest "convert dlg with font", convertTagDlg,
     <center><font face="arial">Hello!</font></center>
   </td></tr></table>
   """
+
+convTest "convert dlg with font face and size", convertTagDlg,
+  """
+  <dlg font="arial 3px">Hello!</dlg>
+
+  <table border="0" cellpadding="2" bgcolor="white" width="300px">
+  <tr><td>
+    <center><font face="arial" size="3px">Hello!</font></center>
+  </td></tr></table>
+  """
+
+
+
+test "collect image transformation attributes":
+  let tag = <>gif(name="source", x="10", y="10", scale="2")
+  check getGifTransformationAttrs(tag) == @[("scale", "2")]
+
+test "make gif filename when gif has a transformation":
+  let tag = <>gif(name="source", x="10", y="10", scale="2")
+  check makeGifFilename(tag) == "source-scale2.gif"

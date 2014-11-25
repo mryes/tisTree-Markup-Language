@@ -1,2 +1,2 @@
-nimrod c -o:../bin/tml --nimcache:./bin/nimcache src/tml.nim
+nimrod c -o:bin/tml --nimcache:./bin/nimcache tml.nim
 ./bin/tml

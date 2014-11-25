@@ -107,19 +107,17 @@ proc convertTagDlg*(tag: PXmlNode): PXmlNode {.procvar.} =
   if tag.isPositioned(): 
     result.wrapInTag(makeDivFromLocation(tag.attr("x"), tag.attr("y")))
 
+proc dummyConvert(tag: PXmlNode): PXmlNode {.procvar.} = tag
+
 const CONVERSION_FUNCTIONS = {
   "gif": convertTagGif,
   "dlg": convertTagDlg
 }  
 
-proc isTmlTag(tag: string): bool = 
-  result = false
+proc conversionFunction(tag: string): proc(tag: PXmlNode): PXmlNode =
   for c in CONVERSION_FUNCTIONS:
-    if c[0] == tag: return true
-
-proc conversionFunction(tag: string): proc(tag: pxmlnode): pxmlnode =
-  for c in conversion_functions:
     if c[0] == tag: return c[1] 
+  return dummyConvert
 
 proc tmlToHtml(tmlHead: PXmlNode): PXmlNode =
   proc buildHtmlTree(tmlTree: PXmlNode): PXmlNode =
@@ -127,9 +125,8 @@ proc tmlToHtml(tmlHead: PXmlNode): PXmlNode =
     result = newXmlTree(tmlTree.tag, [], tmlTree.attrs)
     for i in tmlTree.items:
       result.add(buildHtmlTree(i))
-    if isTmlTag(result.tag):
-      result = conversionFunction(result.tag)(result)
-  # Ignore top tag and go straight to its children.
+    result = conversionFunction(result.tag)(result)
+  # Ignore root tag and go straight to its children.
   # (This means you can use a <tml> tag instead of an <html> tag)
   result = newElement("html")
   for i in tmlHead.items:

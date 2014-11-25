@@ -56,17 +56,19 @@ proc makeTable(content: PXmlNode,
           content)
 
 proc getGifTransformationAttrs*(tag: PXmlNode): seq[tuple[key, value: string]] =
-  const transformationAttrs = ["scale", "crop", "flip"]
+  const transformationAttrs = ["scale", "crop", "flip", 
+                               "hue", "saturation", "brightness"]
   result = @[] 
   for k, v in tag.attrs.pairs:
     if k in transformationAttrs: result.add((k, v)) 
 
+proc cleanPercents(s: string): string = 
+  result = ""
+  for c in s:
+    if c != '%': result.add(c)
+    else: result.add("pct")
+
 proc makeGifFilename*(gifTag: PXmlNode): string = 
-  proc cleanPercents(s: string): string = 
-    result = ""
-    for c in s:
-      if c != '%': result.add(c)
-      else: result.add("pct")
   result = ""
   result.add(gifTag.attr("name"))
   for a in getGifTransformationAttrs(gifTag):
@@ -94,7 +96,14 @@ proc generateTransformedGif(gifTag: PXmlNode): void =
     of "flip":
       if 'x' in a.value: trsArgs.add(" -flop")
       if 'y' in a.value: trsArgs.add(" -flip")
+    of "hue", "saturation", "brightness":
+      trsArgs.add(" -colorspace HSL -modulate ")
+      trsArgs.add(if a.key == "brightness": a.value else: "100")
+      trsArgs.add("," & (if a.key == "saturation": a.value else: "100"))
+      trsArgs.add("," & (if a.key == "hue": a.value else: "100"))
+      trsArgs = trsArgs.replace("%", "") 
   let command = "convert $1 $2 $3" % [filenameNoTrs, trsArgs, filename]
+  echo command
   discard execShellCmd(command)
 
 

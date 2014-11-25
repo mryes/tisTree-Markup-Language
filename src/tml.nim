@@ -1,4 +1,5 @@
-import os, xmltree, htmlparser, sequtils, streams, strutils, strtabs, algorithm, parseutils
+import os, xmltree, htmlparser, sequtils, streams, strutils, 
+       strtabs, algorithm, parseutils, times
 
 
 
@@ -50,33 +51,45 @@ proc makeTable(content: PXmlNode,
           bgcolor=bgcolor, width=width, content)
 
 proc getGifTransformationAttrs*(tag: PXmlNode): seq[tuple[key, value: string]] =
-  const transformationAttrs = ["scale", "crop"]
+  const transformationAttrs = ["scale", "crop", "flip"]
   result = @[] 
   for k, v in tag.attrs.pairs:
     if k in transformationAttrs: result.add((k, v)) 
 
 proc makeGifFilename*(gifTag: PXmlNode): string = 
-  proc stripPercent(s: string): string = 
-    s.split("%")[0]
+  proc cleanPercents(s: string): string = 
+    result = ""
+    for c in s:
+      if c != '%': result.add(c)
+      else: result.add("pct")
   result = ""
   result.add(gifTag.attr("name"))
   for a in getGifTransformationAttrs(gifTag):
-    result.add("-" & a.key & a.value.stripPercent)
+    result.add("-" & a.key & a.value.cleanPercents)
   result.add(".gif")
 
 proc generateTransformedGif(gifTag: PXmlNode): void =
+  proc hasOffset(geoString: string): bool =
+    geoString.count({'+', '-'}) > 0
+  proc fileNewerThan(f1, f2: string): bool =
+    f1.getLastModificationTime() > f2.getLastModificationTime()
   let filename = makeGifFilename(gifTag)
-  if existsFile(fileName): return
-  let attrs = getGifTransformationAttrs(gifTag)
-  var transArgs = "" 
-  for a in attrs:
+  let filenameNoTrs = gifTag.attr("name") & ".gif"
+  if existsFile(filename) and fileNewerThan(filename, filenameNoTrs):
+    return
+  let trsAttrs = getGifTransformationAttrs(gifTag)
+  var trsArgs = "" 
+  for a in trsAttrs:
     case a.key
     of "scale": 
-      transArgs.add(" -filter point -resize " & a.value)
+      trsArgs.add(" -filter point -resize " & a.value)
     of "crop":
-      transArgs.add(" -crop " & a.value & " +repage")
-  let command = "convert $1 $2 $3" % [gifTag.attr("name") & ".gif", transArgs, filename]
-  echo command
+      let cropValue = if not a.value.hasOffset(): a.value & "+0+0" else: a.value
+      trsArgs.add(" -crop " & cropValue & " +repage")
+    of "flip":
+      if 'x' in a.value: trsArgs.add(" -flop")
+      if 'y' in a.value: trsArgs.add(" -flip")
+  let command = "convert $1 $2 $3" % [filenameNoTrs, trsArgs, filename]
   discard execShellCmd(command)
 
 
@@ -97,8 +110,8 @@ proc convertTagDlg*(tag: PXmlNode): PXmlNode {.procvar.} =
 
 
 when isMainModule:
-  let gifTag1 = <>gif(name="compuser", crop="100x100+0+0", scale="200%")  
-  let gifTag2 = <>gif(name="compuser", crop="100x100+0+0")  
+  let gifTag1 = <>gif(name="compuser", crop="100x100", scale="200%", flip="y")  
+  let gifTag2 = <>gif(name="compuser", crop="100x100", flip="xy")  
   let gifTag3 = <>gif(name="compuser", scale="200%")  
   generateTransformedGif(gifTag1)
   generateTransformedGif(gifTag2)

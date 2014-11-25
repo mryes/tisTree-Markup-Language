@@ -131,17 +131,22 @@ proc conversionFunction(tag: string): proc(tag: PXmlNode): PXmlNode =
   return dummyConvert
 
 proc tmlToHtml(tmlHead: PXmlNode): PXmlNode =
+  var transformTasks : seq[PXmlNode] = @[]
   proc buildHtmlTree(tmlTree: PXmlNode): PXmlNode =
     if tmlTree.kind != xnElement: return tmlTree
     result = newXmlTree(tmlTree.tag, [], tmlTree.attrs)
     for i in tmlTree.items:
       result.add(buildHtmlTree(i))
     result = conversionFunction(result.tag)(result)
+    if tmlTree.tag == "gif" and tmlTree.getGifTransformationAttrs.len > 0:
+      transformTasks.add(tmlTree)
   # Ignore root tag and go straight to its children.
   # (This means you can use a <tml> tag instead of an <html> tag)
   result = newElement("html")
   for i in tmlHead.items:
     result.add(buildHtmlTree(i))
+  for tag in transformTasks: 
+    tag.generateTransformedGif()
 
 
 

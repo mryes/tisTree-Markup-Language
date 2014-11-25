@@ -1,4 +1,4 @@
-import os, xmltree, htmlparser, sequtils, streams, strutils, strtabs, algorithm
+import os, xmltree, htmlparser, sequtils, streams, strutils, strtabs, algorithm, parseutils
 
 
 
@@ -56,11 +56,28 @@ proc getGifTransformationAttrs*(tag: PXmlNode): seq[tuple[key, value: string]] =
     if k in transformationAttrs: result.add((k, v)) 
 
 proc makeGifFilename*(gifTag: PXmlNode): string = 
+  proc stripPercent(s: string): string = 
+    s.split("%")[0]
   result = ""
   result.add(gifTag.attr("name"))
   for a in getGifTransformationAttrs(gifTag):
-    result.add("-" & a.key & a.value)
+    result.add("-" & a.key & a.value.stripPercent)
   result.add(".gif")
+
+proc generateTransformedGif(gifTag: PXmlNode): void =
+  let filename = makeGifFilename(gifTag)
+  if existsFile(fileName): return
+  let attrs = getGifTransformationAttrs(gifTag)
+  var transArgs = "" 
+  for a in attrs:
+    case a.key
+    of "scale": 
+      transArgs.add(" -filter point -resize " & a.value)
+    of "crop":
+      transArgs.add(" -crop " & a.value & " +repage")
+  let command = "convert $1 $2 $3" % [gifTag.attr("name") & ".gif", transArgs, filename]
+  echo command
+  discard execShellCmd(command)
 
 
 
@@ -80,6 +97,9 @@ proc convertTagDlg*(tag: PXmlNode): PXmlNode {.procvar.} =
 
 
 when isMainModule:
-  # let fileName = paramStr(1)
-  # let parsedHtml = loadHtml(fileName)
-  
+  let gifTag1 = <>gif(name="compuser", crop="100x100+0+0", scale="200%")  
+  let gifTag2 = <>gif(name="compuser", crop="100x100+0+0")  
+  let gifTag3 = <>gif(name="compuser", scale="200%")  
+  generateTransformedGif(gifTag1)
+  generateTransformedGif(gifTag2)
+  generateTransformedGif(gifTag3)

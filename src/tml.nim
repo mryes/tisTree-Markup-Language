@@ -69,8 +69,8 @@ proc makeGifFilename*(gifTag: PXmlNode): string =
   result.add(".gif")
 
 proc generateTransformedGif(gifTag: PXmlNode): void =
-  proc hasOffset(geoString: string): bool =
-    geoString.count({'+', '-'}) > 0
+  proc hasOffset(geomString: string): bool =
+    geomString.count({'+', '-'}) > 0
   proc fileNewerThan(f1, f2: string): bool =
     f1.getLastModificationTime() > f2.getLastModificationTime()
   let filename = makeGifFilename(gifTag)
@@ -107,12 +107,36 @@ proc convertTagDlg*(tag: PXmlNode): PXmlNode {.procvar.} =
   if tag.isPositioned(): 
     result.wrapInTag(makeDivFromLocation(tag.attr("x"), tag.attr("y")))
 
+const CONVERSION_FUNCTIONS = {
+  "gif": convertTagGif,
+  "dlg": convertTagDlg
+}  
+
+proc isTmlTag(tag: string): bool = 
+  result = false
+  for c in CONVERSION_FUNCTIONS:
+    if c[0] == tag: return true
+
+proc conversionFunction(tag: string): proc(tag: pxmlnode): pxmlnode =
+  for c in conversion_functions:
+    if c[0] == tag: return c[1] 
+
+proc tmlToHtml(tmlHead: PXmlNode): PXmlNode =
+  proc buildHtmlTree(tmlTree: PXmlNode): PXmlNode =
+    if tmlTree.kind != xnElement: return tmlTree
+    result = newXmlTree(tmlTree.tag, [], tmlTree.attrs)
+    for i in tmlTree.items:
+      result.add(buildHtmlTree(i))
+    if isTmlTag(result.tag):
+      result = conversionFunction(result.tag)(result)
+  # Ignore top tag and go straight to its children.
+  # (This means you can use a <tml> tag instead of an <html> tag)
+  result = newElement("html")
+  for i in tmlHead.items:
+    result.add(buildHtmlTree(i))
+
 
 
 when isMainModule:
-  let gifTag1 = <>gif(name="compuser", crop="100x100", scale="200%", flip="y")  
-  let gifTag2 = <>gif(name="compuser", crop="100x100", flip="xy")  
-  let gifTag3 = <>gif(name="compuser", scale="200%")  
-  generateTransformedGif(gifTag1)
-  generateTransformedGif(gifTag2)
-  generateTransformedGif(gifTag3)
+  let tmlInput = parseHtml(readFile(paramStr(1)))
+  writeFile(paramStr(1) & ".result", $tmlToHtml(tmlInput))

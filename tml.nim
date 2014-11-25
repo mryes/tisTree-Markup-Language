@@ -42,13 +42,18 @@ proc setFont(tag: PXmlNode): PXmlNode =
   font.add(newText(tag.innerText))
   result = font
 
-proc makeTable(content: PXmlNode,
-               border: string = "0",
-               cellpadding: string = "2",
-               bgcolor: string = "white",
-               width: string = "300px"): PXmlNode =
-  <>table(border=border, cellpadding=cellpadding, 
-          bgcolor=bgcolor, width=width, content)
+proc makeTable(content: PXmlNode, 
+               border: string = "", cellpadding: string = "", 
+               bgcolor: string = "", width: string = ""): PXmlNode =
+  proc default(s, default: string): string =
+    # This is here so you can pass in an empty string and it will
+    # just ignore that parameter. Makes things simpler on the other end.
+    if s == "": default else: s 
+  <>table(border = border.default("0"),
+          cellpadding = cellpadding.default("2"), 
+          bgcolor = bgcolor.default("white"), 
+          width = width.default("300px"), 
+          content)
 
 proc getGifTransformationAttrs*(tag: PXmlNode): seq[tuple[key, value: string]] =
   const transformationAttrs = ["scale", "crop", "flip"]
@@ -103,16 +108,22 @@ proc convertTagGif*(tag: PXmlNode): PXmlNode {.procvar.} =
 proc convertTagDlg*(tag: PXmlNode): PXmlNode {.procvar.} =
   if tag.innerText == "": return newText("")
   let centeredTR = [<>center(), <>td(), <>tr()]
-  result = makeTable(multiWrap(setFont(tag), centeredTR))
+  result = makeTable(multiWrap(setFont(tag), centeredTR), 
+                     width=tag.attr("w"))
   if tag.isPositioned(): 
     result.wrapInTag(makeDivFromLocation(tag.attr("x"), tag.attr("y")))
+
+proc convertTagPos*(tag: PXmlNode): PXmlNode {.procvar.} =
+  result = makeDivFromLocation(tag.attr("x"), tag.attr("y")) 
+  for i in tag.items: result.add(i)
 
 proc dummyConvert(tag: PXmlNode): PXmlNode {.procvar.} = tag
 
 const CONVERSION_FUNCTIONS = {
   "gif": convertTagGif,
-  "dlg": convertTagDlg
-}  
+  "dlg": convertTagDlg,
+  "pos": convertTagPos
+}
 
 proc conversionFunction(tag: string): proc(tag: PXmlNode): PXmlNode =
   for c in CONVERSION_FUNCTIONS:

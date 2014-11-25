@@ -104,7 +104,28 @@ convTest "convert dlg with font face and size", convertTagDlg,
   </td></tr></table>
   """
 
+convTest "convert dlg with width", convertTagDlg,
+  """
+  <dlg w="500px">Hello!</dlg>
 
+  <table border="0" cellpadding="2" bgcolor="white" width="500px">
+  <tr><td>
+    <center>Hello!</center>
+  </td></tr></table>
+  """ 
+
+convTest "convert pos to div", convertTagPos,
+  """
+  <pos x="40" y="140">
+    <p>Stuff</p>
+    <p>Other stuff</p>
+  </pos>
+
+  <div style="position:absolute;left:40;top:140;">
+    <p>Stuff</p>
+    <p>Other stuff</p>
+  </div>
+  """
 
 test "collect image transformation attributes":
   let tag = <>gif(name="source", x="10", y="10", scale="2")

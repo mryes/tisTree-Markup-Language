@@ -182,9 +182,6 @@ proc generateGifTransformCommand(gifTag: PXmlNode): string =
     case a.key
     of "scale": 
       trsArgs.add(" -resize " & a.value & " +repage")
-    of "crop":
-      let cropValue = if not a.value.hasOffset(): a.value & "+0+0" else: a.value
-      trsArgs.add(" -crop " & cropValue & " +repage")
     of "flip":
       if 'x' in a.value: trsArgs.add(" -flop")
       if 'y' in a.value: trsArgs.add(" -flip")

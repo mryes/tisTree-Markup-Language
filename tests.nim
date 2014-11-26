@@ -13,6 +13,8 @@ proc testTmlConversion(tml, html: string; conversion: proc(tag: PXmlNode): PXmlN
     newStr
   let tmlConverted = parseHtml(tml).conversion()
   let htmlNode = parseHtml(html)
+  echo tmlConverted
+  echo htmlNode
   ($tmlConverted).withoutNewlines == ($htmlNode).withoutNewlines
 
 template convTest(title: string; conversion: proc(tag: PXmlNode): PXmlNode; 
@@ -52,8 +54,27 @@ convTest "convert gif with scale", convertTagGif,
   <gif name="source" x="10" y="20" scale="2" />
 
   <div style="position:absolute;left:10;top:20;">
-    <img src="source-scale2.gif" />
+    <img src="generated/source-scale2.gif" />
   </div>
+  """
+
+convTest "convert gif with cropping (size only)", convertTagGif,
+  """
+  <gif name="source" crop="50 50" />
+
+  <table width="50" height="50" background="source.gif" style="background-repeat:no-repeat;">
+  <tr><td></td></tr>
+  </table>
+  """
+
+convTest "convert gif with cropping (size and offset)", convertTagGif,
+  """
+  <gif name="source" crop="50 50 10px 10px" />
+
+  <table width="50" height="50" background="source.gif" 
+    style="background-repeat:no-repeat;background-position:-10px -10px">
+  <tr><td></td></tr>
+  </table>
   """
 
 test "convert empty dlg to nothing":
@@ -96,7 +117,7 @@ convTest "convert dlg with font face", convertTagDlg,
 
 convTest "convert dlg with font face and size", convertTagDlg,
   """
-  <dlg font="arial 3px">Hello!</dlg>
+  <dlg font="arial, 3px">Hello!</dlg>
 
   <table border="0" cellpadding="2" bgcolor="white" width="300px">
   <tr><td>
@@ -133,4 +154,4 @@ test "collect image transformation attributes":
 
 test "make gif filename when gif has a transformation":
   let tag = <>gif(name="source", x="10", y="10", scale="2")
-  check makeGifFilename(tag) == "source-scale2.gif"
+  check makeGifFilename(tag) == "generated/source-scale2.gif"

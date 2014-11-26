@@ -2,47 +2,48 @@ import os, osproc, xmltree, htmlparser, sequtils, streams, strutils,
        strtabs, algorithm, parseutils, times
 
 
-
-const DIV_STYLE_DEFAULT = "position:absolute;left:$1;top:$2;"
-const GENERATED_GIF_FOLDER = "generated" 
-
+ 
 proc parseHtml*(s: string): PXmlNode =
   parseHtml(newStringStream(s))
 
 proc attrExists(xmlNode: PXmlNode, attribute: string): bool =
   xmlNode.attr(attribute) != ""
 
-proc makeDivFromLocation(x: string, y: string): PXmlNode =
-  let x = if x != "": x else: "0"
-  let y = if y != "": y else: "0"
-  var tDiv = newElement("div")
-  tDiv.attrs = newStringTable({"style": DIV_STYLE_DEFAULT % [x, y]})
-  result = tDiv 
+proc children(xmlNode: PXmlNode): seq[PXmlNode] =
+  ## Odd that xmltree doesn't already have this.
+  result = @[]
+  for i in xmlNode.items: result.add(i)
 
 proc wrapInTag(child: var PXmlNode, father: PXmlNode): void = 
   ## This is the reverse of xmltree.add, which for some reason does not work in
   ## a certain context.
   child = newXmlTree(father.tag, [child], father.attrs)
 
+proc wrapInTag(children: seq[PXmlNode], father: PXmlNode): PXmlNode =
+  newXmlTree(father.tag, children, father.attrs)
+
 proc multiWrap(child: PXmlNode, tags: varargs[PXmlNode]): PXmlNode =
   var varChild = child
   for t in tags:
     varChild.wrapInTag(t)
-  result = varChild
+  result = varchild
+
+proc multiWrap(children: seq[PXmlNode], tags: varargs[PXmlNode]): PXmlNode =
+  let firstChild = children.wrapInTag(tags[0])
+  result = multiWrap(firstChild, (@tags)[1..high(tags)])
+
+
 
 proc isPositioned(tag: PXmlNode): bool =
   tag.attrExists("x") or tag.attrExists("y")
 
-proc setFont(tag: PXmlNode): PXmlNode =
-  if not tag.attrExists("font"): return tag 
-  let fontAttr = tag.attr("font").split(',')
-  var font = newElement("font")
-  font.attrs = newStringTable()
-  font.attrs["face"] = fontAttr[0]
-  if fontAttr.len > 1: font.attrs["size"] = fontAttr[1]
-  for i in tag.items:
-    font.add(i)
-  result = font
+proc makeDivFromLocation(x: string, y: string): PXmlNode =
+  const divStyleDefault = "position:absolute;left:$1;top:$2;"
+  let x = if x != "": x else: "0"
+  let y = if y != "": y else: "0"
+  var tDiv = newElement("div")
+  tDiv.attrs = newStringTable({"style": DIV_STYLE_DEFAULT % [x, y]})
+  result = tDiv 
 
 proc makeTable(content: PXmlNode, 
                border: string = "", cellpadding: string = "", 
@@ -57,43 +58,76 @@ proc makeTable(content: PXmlNode,
           width = width.default("300px"), 
           content)
 
+proc setFont(font: string, items: seq[PXmlNode]): PXmlNode =
+  let fontAttr = font.split(',')
+  var fontTag = newElement("font")
+  fontTag.attrs = newStringTable()
+  fontTag.attrs["face"] = fontAttr[0]
+  if fontAttr.len > 1: fontTag.attrs["size"] = fontAttr[1].strip
+  for i in items: fontTag.add(i)
+  result = fontTag
+
 proc getGifTransformationAttrs*(tag: PXmlNode): seq[tuple[key, value: string]] =
-  const transformationAttrs = ["scale", "crop", "flip", "rotate", 
+  const transformationAttrs = ["scale", "flip", "rotate", 
                                "hue", "saturation", "brightness",
                                "delay"]
   result = @[] 
   for k, v in tag.attrs.pairs:
     if k in transformationAttrs: result.add((k, v)) 
 
-proc cleanPercents(s: string): string = 
-  result = ""
-  for c in s:
-    if c != '%': result.add(c)
-    else: result.add("pct")
+const generatedGifFolder = "generated"
 
 proc makeGifFilename*(gifTag: PXmlNode): string = 
+  proc cleanPercents(s: string): string = 
+    result = ""
+    for c in s:
+      if c != '%': result.add(c)
+      else: result.add("pct")
   result = ""
   if getGifTransformationAttrs(gifTag).len > 0:
-    if not existsDir(GENERATED_GIF_FOLDER): createDir(GENERATED_GIF_FOLDER)
-    result.add(GENERATED_GIF_FOLDER & "/")
+    if not existsDir(generatedGifFolder): createDir(generatedGifFolder)
+    result.add(generatedGifFolder & "/")
   result.add(gifTag.attr("name"))
   for a in getGifTransformationAttrs(gifTag):
     result.add("-" & a.key & a.value.cleanPercents)
   result.add(".gif")
 
+proc makeCropTable(gifTag: PXmlNode): PXmlNode =
+  proc getCropDimensions(crop: string): tuple[x, y, w, h: string] =
+    var dimStrs = crop.split
+    var elementsMissing = 4 - dimStrs.len
+    while elementsMissing > 0:
+      dimStrs.add("0")
+      dec(elementsMissing)    
+    result = (dimStrs[2], dimStrs[3], dimStrs[0], dimStrs[1])
+    if result.x != "0": result.x = "-" & result.x 
+    if result.y != "0": result.y = "-" & result.y 
+  let dims = getCropDimensions(gifTag.attr("crop"))
+  let positionStyle = if dims.x != "0" or dims.y != "0": 
+                        "background-position:" & dims.x & " " & dims.y 
+                      else: "" 
+  result = <>table(width=dims.w, height=dims.h, background=makeGifFilename(gifTag),
+                   style="background-repeat:no-repeat;" & positionStyle, 
+                   <>tr(<>td())) 
+
 
 
 proc convertTagGif*(tag: PXmlNode): PXmlNode {.procvar.} =
   if tag.attrsLen == 0: return <>img()
-  result = <>img(src=makeGifFilename(tag))
+  if not tag.attrExists("crop"):
+    result = <>img(src=makeGifFilename(tag))
+  else: result = makeCropTable(tag)
   if tag.isPositioned(): 
     result.wrapInTag(makeDivFromLocation(tag.attr("x"), tag.attr("y")))
 
 proc convertTagDlg*(tag: PXmlNode): PXmlNode {.procvar.} =
   if tag.innerText == "": return newText("")
   let centeredTR = [<>center(), <>td(), <>tr()]
-  result = makeTable(multiWrap(setFont(tag), centeredTR), 
-                     width=tag.attr("w"))
+  let children = tag.children
+  let content = if tag.attrExists("font"): 
+                  multiWrap(setFont(tag.attr("font"), children), centeredTR)
+                else: multiWrap(children, centeredTR)
+  result = makeTable(content, width=tag.attr("w"))
   if tag.isPositioned(): 
     result.wrapInTag(makeDivFromLocation(tag.attr("x"), tag.attr("y")))
 
@@ -177,7 +211,7 @@ proc transformGifs(gifs: seq[PXmlNode]): void =
 
 proc deleteUnusedGeneratedGifs(gifsUsed: seq[PXmlNode]): void = 
   let usedGifFilenames = gifsUsed.mapIt(string, it.makeGifFilename())
-  for f in walkFiles(GENERATED_GIF_FOLDER & "/*.gif"):
+  for f in walkFiles(generatedGifFolder & "/*.gif"):
     if f notin usedGifFilenames:
        removeFile(f)
 

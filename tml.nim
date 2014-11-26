@@ -4,6 +4,7 @@ import os, xmltree, htmlparser, sequtils, streams, strutils,
 
 
 const DIV_STYLE_DEFAULT = "position:absolute;left:$1;top:$2;"
+const GENERATED_GIF_FOLDER = "generated" 
 
 proc parseHtml*(s: string): PXmlNode =
   parseHtml(newStringStream(s))
@@ -70,6 +71,9 @@ proc cleanPercents(s: string): string =
 
 proc makeGifFilename*(gifTag: PXmlNode): string = 
   result = ""
+  if getGifTransformationAttrs(gifTag).len > 0:
+    if not existsDir(GENERATED_GIF_FOLDER): createDir(GENERATED_GIF_FOLDER)
+    result.add(GENERATED_GIF_FOLDER & "/")
   result.add(gifTag.attr("name"))
   for a in getGifTransformationAttrs(gifTag):
     result.add("-" & a.key & a.value.cleanPercents)
@@ -139,6 +143,12 @@ proc conversionFunction(tag: string): proc(tag: PXmlNode): PXmlNode =
     if c[0] == tag: return c[1] 
   return dummyConvert
 
+proc deleteUnusedGeneratedGifs(gifsUsed: seq[PXmlNode]): void = 
+  let usedGifFilenames = gifsUsed.mapIt(string, it.makeGifFilename())
+  for f in walkFiles(GENERATED_GIF_FOLDER & "/*.gif"):
+    if f notin usedGifFilenames:
+       removeFile(f)
+
 proc tmlToHtml(tmlHead: PXmlNode): PXmlNode =
   var transformTasks : seq[PXmlNode] = @[]
   proc buildHtmlTree(tmlTree: PXmlNode): PXmlNode =
@@ -156,6 +166,7 @@ proc tmlToHtml(tmlHead: PXmlNode): PXmlNode =
     result.add(buildHtmlTree(i))
   for tag in transformTasks: 
     tag.generateTransformedGif()
+  deleteUnusedGeneratedGifs(transformTasks)
 
 
 

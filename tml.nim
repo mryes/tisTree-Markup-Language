@@ -1,5 +1,5 @@
 import os, osproc, xmltree, htmlparser, sequtils, streams, strutils, 
-       strtabs, algorithm, parseutils, times
+       strtabs, algorithm, parseutils, times, tables
 
 
  
@@ -32,18 +32,36 @@ proc multiWrap(children: seq[PXmlNode], tags: varargs[PXmlNode]): PXmlNode =
   let firstChild = children.wrapInTag(tags[0])
   result = multiWrap(firstChild, (@tags)[1..high(tags)])
 
+proc toUpper(xml: PXmlNode): PXmlNode =
+  if xml.kind != xnElement: return xml 
+  var attrs = newStringTable()
+  if xml.attrsLen > 0:
+    for k in xml.attrs.keys:
+      attrs[k.toUpper] = xml.attrs[k]
+  result = newXmlTree(xml.tag.toUpper, [], attrs)
+  for i in xml.items:
+    result.add(i.toUpper)
+
 
 
 proc isPositioned(tag: PXmlNode): bool =
   tag.attrExists("x") or tag.attrExists("y")
 
-proc makeDivFromLocation(x: string, y: string): PXmlNode =
-  const divStyleDefault = "position:absolute;left:$1;top:$2;"
-  let x = if x != "": x else: "0"
-  let y = if y != "": y else: "0"
-  var tDiv = newElement("div")
-  tDiv.attrs = newStringTable({"style": DIV_STYLE_DEFAULT % [x, y]})
-  result = tDiv 
+proc makeDivFromTag(tag: PXmlNode): PXmlNode =
+  ## Construct a div to style a tag.
+  ## Returns an empty tag if there are no styles to apply.
+  var style = ""
+  if tag.isPositioned():
+    const positionStyleTemplate = "position:absolute;left:$1;top:$2;" 
+    var (x, y) = (tag.attr("x"), tag.attr("y"))
+    if x == "": x = "0"
+    if y == "": y = "0"
+    style.add(positionStyleTemplate % [x, y])
+  if tag.attrExists("style"):
+    style.add(tag.attr("style"))
+  if style == "": return newElement("")
+  result = newElement("div")
+  result.attrs = newStringTable({"style": style})
 
 proc makeTable(content: PXmlNode, 
                border: string = "", cellpadding: string = "", 
@@ -67,13 +85,13 @@ proc setFont(font: string, items: seq[PXmlNode]): PXmlNode =
   for i in items: fontTag.add(i)
   result = fontTag
 
-proc getGifTransformationAttrs*(tag: PXmlNode): seq[tuple[key, value: string]] =
-  const transformationAttrs = ["scale", "flip", "rotate", 
+proc getGifTransformationAttrs*(tag: PXmlNode): TTable[string, string] =
+  const transformationAttrs = ["scale", "prescale", "flip", "rotate", 
                                "hue", "saturation", "brightness",
                                "delay"]
-  result = @[] 
+  result = initTable[string, string]() 
   for k, v in tag.attrs.pairs:
-    if k in transformationAttrs: result.add((k, v)) 
+    if k in transformationAttrs: result[k] = v 
 
 const generatedGifFolder = "generated"
 
@@ -88,8 +106,8 @@ proc makeGifFilename*(gifTag: PXmlNode): string =
     if not existsDir(generatedGifFolder): createDir(generatedGifFolder)
     result.add(generatedGifFolder & "/")
   result.add(gifTag.attr("name"))
-  for a in getGifTransformationAttrs(gifTag):
-    result.add("-" & a.key & a.value.cleanPercents)
+  for a in getGifTransformationAttrs(gifTag).pairs:
+    result.add("-" & a.key & a.val.cleanPercents)
   result.add(".gif")
 
 proc makeCropTable(gifTag: PXmlNode): PXmlNode =
@@ -117,8 +135,8 @@ proc convertTagGif*(tag: PXmlNode): PXmlNode {.procvar.} =
   if not tag.attrExists("crop"):
     result = <>img(src=makeGifFilename(tag))
   else: result = makeCropTable(tag)
-  if tag.isPositioned(): 
-    result.wrapInTag(makeDivFromLocation(tag.attr("x"), tag.attr("y")))
+  let tDiv = makeDivFromTag(tag)
+  if tDiv.tag != "": result.wrapInTag(tDiv)
 
 proc convertTagDlg*(tag: PXmlNode): PXmlNode {.procvar.} =
   if tag.innerText == "": return newText("")
@@ -128,11 +146,12 @@ proc convertTagDlg*(tag: PXmlNode): PXmlNode {.procvar.} =
                   multiWrap(setFont(tag.attr("font"), children), centeredTR)
                 else: multiWrap(children, centeredTR)
   result = makeTable(content, width=tag.attr("w"))
-  if tag.isPositioned(): 
-    result.wrapInTag(makeDivFromLocation(tag.attr("x"), tag.attr("y")))
+  let tDiv = makeDivFromTag(tag)
+  if tDiv.tag != "": result.wrapInTag(tDiv)
 
 proc convertTagPos*(tag: PXmlNode): PXmlNode {.procvar.} =
-  result = makeDivFromLocation(tag.attr("x"), tag.attr("y")) 
+  result = makeDivFromTag(tag)
+  if result.tag == "": return newText("")
   for i in tag.items: result.add(i)
 
 proc dummyConvert(tag: PXmlNode): PXmlNode {.procvar.} = tag
@@ -169,8 +188,6 @@ proc tmlToHtml(tmlHead: PXmlNode): tuple[html: PXmlNode, gifsToTransform: seq[PX
 
 
 proc generateGifTransformCommand(gifTag: PXmlNode): string =
-  proc hasOffset(geomString: string): bool =
-    geomString.count({'+', '-'}) > 0
   proc fileNewerThan(f1, f2: string): bool =
     f1.getLastModificationTime() > f2.getLastModificationTime()
   let filename = makeGifFilename(gifTag)
@@ -178,23 +195,25 @@ proc generateGifTransformCommand(gifTag: PXmlNode): string =
   if existsFile(filename) and fileNewerThan(filename, filenameNoTrs): return ""
   let trsAttrs = getGifTransformationAttrs(gifTag)
   var trsArgs = " -filter point -background \"rgba(0,0,0,0)\""
-  for a in trsAttrs:
+  if trsAttrs.hasKey("prescale"):
+    trsArgs.add(" -resize " & trsAttrs["prescale"] & " +repage")
+  for a in trsAttrs.pairs:
     case a.key
     of "scale": 
-      trsArgs.add(" -resize " & a.value & " +repage")
+      trsArgs.add(" -resize " & a.val & " +repage")
     of "flip":
-      if 'x' in a.value: trsArgs.add(" -flop")
-      if 'y' in a.value: trsArgs.add(" -flip")
+      if 'x' in a.val: trsArgs.add(" -flop")
+      if 'y' in a.val: trsArgs.add(" -flip")
     of "rotate":
-      trsArgs.add(" -rotate " & a.value)
+      trsArgs.add(" -rotate " & a.val)
     of "hue", "saturation", "brightness":
       trsArgs.add(" -colorspace HSL -modulate ")
-      trsArgs.add(if a.key == "brightness": a.value else: "100")
-      trsArgs.add("," & (if a.key == "saturation": a.value else: "100"))
-      trsArgs.add("," & (if a.key == "hue": a.value else: "100"))
+      trsArgs.add(if a.key == "brightness": a.val else: "100")
+      trsArgs.add("," & (if a.key == "saturation": a.val else: "100"))
+      trsArgs.add("," & (if a.key == "hue": a.val else: "100"))
       trsArgs = trsArgs.replace("%", "")
     of "delay":
-      trsArgs.add(" -set delay " & a.value) 
+      trsArgs.add(" -set delay " & a.val) 
   result = "convert $1 $2 $3" % [filenameNoTrs, trsArgs, filename]
 
 proc transformGifs(gifs: seq[PXmlNode]): void =
@@ -223,5 +242,5 @@ when isMainModule:
   let fileExtension = filename.splitFile.ext
   let outputFilename = if fileExtension == ".html": filename & ".result" 
                        else: filename.split('.')[0] & ".html" 
-  writeFile(outputFilename, $htmlOutput)
+  writeFile(outputFilename, $htmlOutput.toUpper)
   echo "Done!"

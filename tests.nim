@@ -49,6 +49,24 @@ convTest "convert gif with position", convertTagGif,
   </div>
   """
 
+convTest "convert gif with position and style", convertTagGif,
+  """
+  <gif name="source" x="10" y="20" style="background-color:white" />
+
+  <div style="position:absolute;left:10;top:20;background-color:white">
+    <img src="source.gif" />
+  </div>
+  """
+
+convTest "convert gif with style and no position", convertTagGif,
+  """
+  <gif name="source" style="background-color:white" />
+
+  <div style="background-color:white">
+    <img src="source.gif" />
+  </div>
+  """ 
+
 convTest "convert gif with scale", convertTagGif,
   """
   <gif name="source" x="10" y="20" scale="2" />
@@ -147,10 +165,6 @@ convTest "convert pos to div", convertTagPos,
     <p>Other stuff</p>
   </div>
   """
-
-test "collect image transformation attributes":
-  let tag = <>gif(name="source", x="10", y="10", scale="2")
-  check getGifTransformationAttrs(tag) == @[("scale", "2")]
 
 test "make gif filename when gif has a transformation":
   let tag = <>gif(name="source", x="10", y="10", scale="2")

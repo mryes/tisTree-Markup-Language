@@ -1,7 +1,6 @@
 include tml
 
-proc generateOutputFromFile*(filename: string): void = 
-  let htmlOutput = compileTml(readFile(filename))
+proc generateOutput*(filename, htmlOutput: string): void = 
   let fileExtension = filename.splitFile.ext
   let outputFilename = if fileExtension == ".html": filename & ".result" 
                        else: filename.split('.')[0] & ".html" 
@@ -9,4 +8,5 @@ proc generateOutputFromFile*(filename: string): void =
 
 when isMainModule:
   let filename = paramStr(1)
-  generateOutputFromFile(filename)
+  let html = compileTml(readFile(filename), filename.splitPath.head) 
+  generateOutput(filename, html)

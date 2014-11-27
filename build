@@ -1,1 +1,2 @@
+nimrod c -o:bin/tmlc --nimcache:./bin/nimcache tmlc.nim
 nimrod c -o:bin/tmld --nimcache:./bin/nimcache tmld.nim

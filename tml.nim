@@ -29,8 +29,8 @@ proc multiWrap(child: PXmlNode, tags: varargs[PXmlNode]): PXmlNode =
   result = varchild
 
 proc multiWrap(children: seq[PXmlNode], tags: varargs[PXmlNode]): PXmlNode =
-  let firstChild = children.wrapInTag(tags[0])
-  result = multiWrap(firstChild, (@tags)[1..high(tags)])
+  let firstTag = children.wrapInTag(tags[0])
+  result = multiWrap(firstTag, (@tags)[1..high(tags)])
 
 proc toUpper(xml: PXmlNode): PXmlNode =
   if xml.kind != xnElement: return xml 
@@ -103,7 +103,6 @@ proc makeGifFilename*(gifTag: PXmlNode): string =
       else: result.add("pct")
   result = ""
   if getGifTransformationAttrs(gifTag).len > 0:
-    if not existsDir(generatedGifFolder): createDir(generatedGifFolder)
     result.add(generatedGifFolder & "/")
   result.add(gifTag.attr("name"))
   for a in getGifTransformationAttrs(gifTag).pairs:
@@ -167,7 +166,8 @@ proc conversionFunction(tag: string): proc(tag: PXmlNode): PXmlNode =
     if c[0] == tag: return c[1] 
   return dummyConvert
 
-proc tmlToHtml(tmlHead: PXmlNode): tuple[html: PXmlNode, gifsToTransform: seq[PXmlNode]] =
+proc tmlToHtml(tml: string): tuple[html: string, gifsToTransform: seq[PXmlNode]] =
+  let tmlHead = parseHtml(tml)
   var gifsToTransform: seq[PXmlNode] = @[]
   proc buildHtmlTree(tmlTree: PXmlNode): PXmlNode =
     if tmlTree.kind != xnElement: return tmlTree
@@ -182,19 +182,20 @@ proc tmlToHtml(tmlHead: PXmlNode): tuple[html: PXmlNode, gifsToTransform: seq[PX
   var html = newElement("html")
   for i in tmlHead.items:
     html.add(buildHtmlTree(i))
-  result = (html, gifsToTransform)
+  result = ($html.toUpper, gifsToTransform)
 
 
 
-proc generateGifTransformCommand(gifTag: PXmlNode): string =
+proc generateGifTransformCommand(gifTag: PXmlNode, projPath: string): string =
   ## Create the ImageMagick commands to generate gif transformations.
   ## (Note: currently relies on the order the attributes end up taking
   ## inside string tables. By chance this is a good order, for now.)
   proc fileNewerThan(f1, f2: string): bool =
     f1.getLastModificationTime() > f2.getLastModificationTime()
-  let filename = makeGifFilename(gifTag)
-  let filenameNoTrs = gifTag.attr("name") & ".gif"
-  if existsFile(filename) and fileNewerThan(filename, filenameNoTrs): return ""
+  let filename = projPath / makeGifFilename(gifTag)
+  let filenameNoTrs = projPath / gifTag.attr("name") & ".gif"
+  if existsFile(filename) and fileNewerThan(filename, filenameNoTrs): 
+    return ""
   let trsAttrs = getGifTransformationAttrs(gifTag)
   var trsArgs = " -filter point -background \"rgba(0,0,0,0)\""
   if trsAttrs.hasKey("prescale"):
@@ -218,26 +219,27 @@ proc generateGifTransformCommand(gifTag: PXmlNode): string =
       trsArgs.add(" -set delay " & a.val) 
   result = "convert $1 $2 $3" % [filenameNoTrs, trsArgs, filename]
 
-proc transformGifs(gifs: seq[PXmlNode]): void =
+proc transformAndOutputGifs(gifs: seq[PXmlNode], projPath: string): void =
+  if not existsDir(projPath / generatedGifFolder): 
+    createDir(projPath / generatedGifFolder)
   var trsCommands : seq[string] = @[]
   for g in gifs: 
-    let command = g.generateGifTransformCommand()
+    let command = g.generateGifTransformCommand(projPath)
     if command != "": 
-      echo "Generating " & g.makeGifFilename()
+      echo ("Generating " & (projPath / g.makeGifFilename()))
       trsCommands.add(command)
   discard execProcesses(trsCommands)
 
-proc deleteUnusedGeneratedGifs(gifsUsed: seq[PXmlNode]): void = 
-  let usedGifFilenames = gifsUsed.mapIt(string, it.makeGifFilename())
-  for f in walkFiles(generatedGifFolder & "/*.gif"):
+proc deleteUnusedGeneratedGifs(gifsUsed: seq[PXmlNode], projPath: string): void = 
+  let usedGifFilenames = gifsUsed.mapIt(string, projPath / it.makeGifFilename())
+  for f in walkFiles(projPath / generatedGifFolder & "/*.gif"):
     if f notin usedGifFilenames:
        removeFile(f)
 
 
 
-proc compileTml(source: string): string =
-  let tmlInput = parseHtml(source)
-  let (htmlOutput, gifsToTransform) = tmlToHtml(tmlInput)
-  transformGifs(gifsToTransform)
-  deleteUnusedGeneratedGifs(gifsToTransform)
-  result = $htmlOutput.toUpper
+proc compileTml*(source, projPath: string): string =
+  let (htmlOutput, gifsToTransform) = tmlToHtml(source)
+  result = htmlOutput
+  transformAndOutputGifs(gifsToTransform, projPath)
+  deleteUnusedGeneratedGifs(gifsToTransform, projPath)

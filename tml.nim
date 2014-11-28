@@ -66,6 +66,10 @@ proc makeDivFromTag(tag: PXmlNode): PXmlNode =
   result = newElement("div")
   result.attrs = newStringTable({"style": style})
 
+proc wrapInDiv(tag: var PXmlNode, madeFrom: PXmlNode): void =
+  let tDiv = makeDivFromTag(madeFrom)
+  if tDiv.tag != "": tag.wrapInTag(tDiv) 
+
 proc setFont(font: string, items: seq[PXmlNode]): PXmlNode =
   let fontAttr = font.split(',')
   var fontTag = newElement("font")
@@ -123,7 +127,7 @@ proc makeShapeTable(tag: PXmlNode, configurations): PXmlNode =
   let tbody = <>tbody(<>tr(<>td(style="border-style:none;"))) 
   let commonTableStyle = "empty-cells:show;border-style:solid;"
   let shapeType  = tag.attr("type")
-  let shapeColor = tag.attr("color", default="black")
+  let shapeColor = tag.attr("color", default="white")
   let shapeSize  = tag.attr("size",  default="100")
   if not configurations.hasKey(shapeType):
     configurations[shapeType] = "transparent transparent transparent transparent" 
@@ -140,8 +144,7 @@ proc convertTagGif*(tag: PXmlNode): PXmlNode {.procvar.} =
   if not tag.attrExists("crop"):
     result = <>img(src=makeGifFilename(tag))
   else: result = makeCropTable(tag)
-  let tDiv = makeDivFromTag(tag)
-  if tDiv.tag != "": result.wrapInTag(tDiv)
+  result.wrapInDiv(madeFrom=tag)
 
 proc convertTagDlg*(tag: PXmlNode): PXmlNode {.procvar.} =
   if tag.innerText == "": return newText("")
@@ -152,8 +155,7 @@ proc convertTagDlg*(tag: PXmlNode): PXmlNode {.procvar.} =
                 else: multiWrap(children, centeredTR)
   result = <>table(content, border="0", cellpadding="2", bgcolor="white", 
                    width=tag.attr("w", default="300px"))
-  let tDiv = makeDivFromTag(tag)
-  if tDiv.tag != "": result.wrapInTag(tDiv)
+  result.wrapInDiv(madeFrom=tag)
 
 proc convertTagPos*(tag: PXmlNode): PXmlNode {.procvar.} =
   result = makeDivFromTag(tag)
@@ -161,22 +163,20 @@ proc convertTagPos*(tag: PXmlNode): PXmlNode {.procvar.} =
   for i in tag.items: result.add(i)
 
 proc convertTagItri*(tag: PXmlNode): PXmlNode {.procvar.} =
-  result = makeShapeTable(tag, configurations = newTable({
+  result = makeShapeTable(tag, configurations=newTable({
     "up":    "transparent transparent $1 transparent",
     "down":  "$1 transparent transparent transparent",
     "left":  "transparent $1 transparent transparent",
     "right": "transparent transparent transparent $1"}))
-  let tDiv = makeDivFromTag(tag)
-  if tDiv.tag != "": result.wrapInTag(tDiv) 
+  result.wrapInDiv(madeFrom=tag)
 
 proc convertTagRtri*(tag: PXmlNode): PXmlNode {.procvar.} =
-  result = makeShapeTable(tag, configurations = newTable({
+  result = makeShapeTable(tag, configurations=newTable({
     "up left":    "$1 transparent transparent $1",
     "up right":   "$1 $1 transparent transparent",
     "down left":  "transparent transparent $1 $1",
     "down right": "transparent $1 $1 transparent"}))
-  let tDiv = makeDivFromTag(tag)
-  if tDiv.tag != "": result.wrapInTag(tDiv) 
+  result.wrapInDiv(madeFrom=tag) 
 
 proc dummyConvert(tag: PXmlNode): PXmlNode {.procvar.} = tag
 

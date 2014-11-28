@@ -90,17 +90,12 @@ proc getGifTransformationAttrs*(tag: PXmlNode): TTable[string, string] =
 const generatedGifFolder = "generated"
 
 proc makeGifFilename*(gifTag: PXmlNode): string = 
-  proc cleanPercents(s: string): string = 
-    result = ""
-    for c in s:
-      if c != '%': result.add(c)
-      else: result.add("pct")
   result = ""
   if getGifTransformationAttrs(gifTag).len > 0:
-    result.add(generatedGifFolder & "/")
+    result.add(generatedGifFolder & DirSep)
   result.add(gifTag.attr("name"))
   for a in getGifTransformationAttrs(gifTag).pairs:
-    result.add("-" & a.key & a.val.cleanPercents)
+    result.add("-" & a.key & a.val.replace("%", "pct"))
   result.add(".gif")
 
 proc makeCropTable(gifTag: PXmlNode): PXmlNode =
@@ -215,8 +210,6 @@ proc tmlToHtml(tml: string): tuple[html: string, gifsToTransform: seq[PXmlNode]]
 
 proc generateGifTransformCommand(gifTag: PXmlNode, projPath: string): string =
   ## Create the ImageMagick commands to generate gif transformations.
-  ## (Note: currently relies on the order the attributes end up taking
-  ## inside string tables. By chance this is a good order, for now.)
   proc fileNewerThan(f1, f2: string): bool =
     f1.getLastModificationTime() > f2.getLastModificationTime()
   let filename = projPath / makeGifFilename(gifTag)
@@ -224,27 +217,23 @@ proc generateGifTransformCommand(gifTag: PXmlNode, projPath: string): string =
   if existsFile(filename) and fileNewerThan(filename, filenameNoTrs): 
     return ""
   let trsAttrs = getGifTransformationAttrs(gifTag)
-  var trsArgs = " -filter point -background \"rgba(0,0,0,0)\""
+  var trsArgs = " -filter point -background \"rgba(0,0,0,0)\" "
   if trsAttrs.hasKey("prescale"):
     trsArgs.add(" -resize " & trsAttrs["prescale"] & " +repage")
-  for a in trsAttrs.pairs:
-    case a.key
-    of "scale": 
-      trsArgs.add(" -resize " & a.val & " +repage")
-    of "flip":
-      if 'x' in a.val: trsArgs.add(" -flop")
-      if 'y' in a.val: trsArgs.add(" -flip")
-    of "rotate":
-      trsArgs.add(" -rotate " & a.val)
-    of "hue", "saturation", "brightness":
-      trsArgs.add(" -colorspace HSL -modulate ")
-      trsArgs.add(if a.key == "brightness": a.val else: "100")
-      trsArgs.add("," & (if a.key == "saturation": a.val else: "100"))
-      trsArgs.add("," & (if a.key == "hue": a.val else: "100"))
-      trsArgs = trsArgs.replace("%", "")
-    of "delay":
-      trsArgs.add(" -set delay " & a.val) 
-  result = "convert $1 $2 $3" % [filenameNoTrs, trsArgs, filename]
+  if trsAttrs.hasKey("flip"):
+    if 'x' in trsAttrs["flip"]: trsArgs.add(" -flop")
+    if 'y' in trsAttrs["flip"]: trsArgs.add(" -flip") 
+  if trsAttrs.hasKey("delay"):
+    trsArgs.add(" -set delay " & trsAttrs["delay"])
+  if trsAttrs.hasKey("rotate"):
+    trsArgs.add(" -rotate " & trsAttrs["rotate"])
+  trsArgs.add(" -modulate ")
+  for k in ["brightness", "saturation", "hue"]:
+    if trsAttrs.hasKey(k): trsArgs.add(trsAttrs[k]) else: trsArgs.add("100")
+    if k != "hue": trsArgs.add(',')
+  if trsAttrs.hasKey("scale"):
+    trsArgs.add(" -resize " & trsAttrs["scale"] & " +repage")
+  result = findExe("convert") & " $1 $2 $3" % [filenameNoTrs, trsArgs, filename]
 
 proc transformAndOutputGifs(gifs: seq[PXmlNode], projPath: string): void =
   if not existsDir(projPath / generatedGifFolder): 

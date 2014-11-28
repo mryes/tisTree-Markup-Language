@@ -8,5 +8,5 @@ proc generateOutput*(filename, htmlOutput: string): void =
 
 when isMainModule:
   let filename = paramStr(1)
-  let html = compileTml(readFile(filename), filename.splitPath.head) 
+  let html = compileTml(readFile(filename), filename.parentDir) 
   generateOutput(filename, html)

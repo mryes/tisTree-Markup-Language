@@ -9,6 +9,9 @@ proc parseHtml*(s: string): PXmlNode =
 proc attrExists(xmlNode: PXmlNode, attribute: string): bool =
   xmlNode.attr(attribute) != ""
 
+proc attr(tag: PXmlNode, attribute: string, default=""): string =
+  if tag.attrExists(attribute): xmltree.attr(tag, attribute) else: default
+
 proc children(xmlNode: PXmlNode): seq[PXmlNode] =
   ## Odd that xmltree doesn't already have this.
   result = @[]
@@ -63,19 +66,6 @@ proc makeDivFromTag(tag: PXmlNode): PXmlNode =
   result = newElement("div")
   result.attrs = newStringTable({"style": style})
 
-proc makeTable(content: PXmlNode, 
-               border: string = "", cellpadding: string = "", 
-               bgcolor: string = "", width: string = ""): PXmlNode =
-  proc default(s, default: string): string =
-    # This is here so you can pass in an empty string and it will
-    # just ignore that parameter. Makes things simpler on the other end.
-    if s == "": default else: s 
-  <>table(border = border.default("0"),
-          cellpadding = cellpadding.default("2"), 
-          bgcolor = bgcolor.default("white"), 
-          width = width.default("300px"), 
-          content)
-
 proc setFont(font: string, items: seq[PXmlNode]): PXmlNode =
   let fontAttr = font.split(',')
   var fontTag = newElement("font")
@@ -127,6 +117,22 @@ proc makeCropTable(gifTag: PXmlNode): PXmlNode =
                    style="background-repeat:no-repeat;" & positionStyle, 
                    <>tr(<>td())) 
 
+proc makeShapeTable(tag: PXmlNode, configurations): PXmlNode =
+  ## Make an initial table for displaying shapes. 
+  ## "configurations" maps type attributes to border-color attributes.
+  let tbody = <>tbody(<>tr(<>td(style="border-style:none;"))) 
+  let commonTableStyle = "empty-cells:show;border-style:solid;"
+  let shapeType  = tag.attr("type")
+  let shapeColor = tag.attr("color", default="black")
+  let shapeSize  = tag.attr("size",  default="100")
+  if not configurations.hasKey(shapeType):
+    configurations[shapeType] = "transparent transparent transparent transparent" 
+  let colorStyle = configurations[shapeType] % shapeColor 
+  result = <>table(tbody, border = shapeSize,
+                   style = commonTableStyle & "border-color:" & colorStyle & ";",
+                   bgcolor = "transparent", cellpadding = "0", cellspacing = "0", 
+                   height = "0", width = "0")
+
 
 
 proc convertTagGif*(tag: PXmlNode): PXmlNode {.procvar.} =
@@ -144,7 +150,8 @@ proc convertTagDlg*(tag: PXmlNode): PXmlNode {.procvar.} =
   let content = if tag.attrExists("font"): 
                   multiWrap(setFont(tag.attr("font"), children), centeredTR)
                 else: multiWrap(children, centeredTR)
-  result = makeTable(content, width=tag.attr("w"))
+  result = <>table(content, border="0", cellpadding="2", bgcolor="white", 
+                   width=tag.attr("w", default="300px"))
   let tDiv = makeDivFromTag(tag)
   if tDiv.tag != "": result.wrapInTag(tDiv)
 
@@ -153,12 +160,32 @@ proc convertTagPos*(tag: PXmlNode): PXmlNode {.procvar.} =
   if result.tag == "": return newText("")
   for i in tag.items: result.add(i)
 
+proc convertTagItri*(tag: PXmlNode): PXmlNode {.procvar.} =
+  result = makeShapeTable(tag, configurations = newTable({
+    "up":    "transparent transparent $1 transparent",
+    "down":  "$1 transparent transparent transparent",
+    "left":  "transparent $1 transparent transparent",
+    "right": "transparent transparent transparent $1"}))
+  let tDiv = makeDivFromTag(tag)
+  if tDiv.tag != "": result.wrapInTag(tDiv) 
+
+proc convertTagRtri*(tag: PXmlNode): PXmlNode {.procvar.} =
+  result = makeShapeTable(tag, configurations = newTable({
+    "up left":    "$1 transparent transparent $1",
+    "up right":   "$1 $1 transparent transparent",
+    "down left":  "transparent transparent $1 $1",
+    "down right": "transparent $1 $1 transparent"}))
+  let tDiv = makeDivFromTag(tag)
+  if tDiv.tag != "": result.wrapInTag(tDiv) 
+
 proc dummyConvert(tag: PXmlNode): PXmlNode {.procvar.} = tag
 
 const CONVERSION_FUNCTIONS = {
-  "gif": convertTagGif,
-  "dlg": convertTagDlg,
-  "pos": convertTagPos
+  "gif":  convertTagGif,
+  "dlg":  convertTagDlg,
+  "pos":  convertTagPos,
+  "itri": convertTagItri,
+  "rtri": convertTagRtri
 }
 
 proc conversionFunction(tag: string): proc(tag: PXmlNode): PXmlNode =

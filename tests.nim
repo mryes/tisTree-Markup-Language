@@ -166,6 +166,44 @@ convTest "convert pos to div", convertTagPos,
   </div>
   """
 
+convTest "convert up-pointing isosceles triangle to table", convertTagItri,
+  """
+  <itri type="up" x="100" size="100" color="blue" />
+
+  <div style="position:absolute;left:100;top:0;">
+  <table 
+    style="empty-cells:show;border-style:solid;border-color:transparent transparent blue transparent;" 
+    bgcolor="transparent" border="100" cellpadding="0" cellspacing="0" height="0" width="0">
+  <tbody><tr><td style="border-style:none;"></td></tr></tbody>
+  </table>
+  </div>
+  """
+
+convTest "convert right-pointing isosceles triangle to table", convertTagItri,
+  """
+  <itri type="right" x="100" size="100" color="blue" />
+
+  <div style="position:absolute;left:100;top:0;">
+  <table 
+    style="empty-cells:show;border-style:solid;border-color:transparent transparent transparent blue;" 
+    bgcolor="transparent" border="100" cellpadding="0" cellspacing="0" height="0" width="0">
+  <tbody><tr><td style="border-style:none;"></td></tr></tbody>
+  </table>
+  </div>
+  """
+
+convTest "convert down-pointing right triangle to table", convertTagRtri,
+  """
+  <rtri type="up right" x="100" y="600" size="75" color="white" />
+
+  <div style="position:absolute;left:100;top:600;">
+  <table style="empty-cells:show;border-style:solid;border-color:white white transparent transparent;" 
+    bgcolor="transparent" border="75" cellpadding="0" cellspacing="0" height="0" width="0">
+  <tbody><tr><td style="border-style:none;"></td></tr></tbody>
+  </table>
+  </div> 
+  """
+
 test "make gif filename when gif has a transformation":
   let tag = <>gif(name="source", x="10", y="10", scale="2")
   check makeGifFilename(tag) == "generated/source-scale2.gif"

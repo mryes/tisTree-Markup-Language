@@ -89,10 +89,10 @@ proc getGifTransformationAttrs*(tag: PXmlNode): TTable[string, string] =
 
 const generatedGifFolder = "generated"
 
-proc makeGifFilename*(gifTag: PXmlNode): string = 
+proc makeGifFilename*(gifTag: PXmlNode, sep: char): string = 
   result = ""
   if getGifTransformationAttrs(gifTag).len > 0:
-    result.add(generatedGifFolder & DirSep)
+    result.add(generatedGifFolder & sep)
   result.add(gifTag.attr("name"))
   for a in getGifTransformationAttrs(gifTag).pairs:
     result.add("-" & a.key & a.val.replace("%", "pct"))
@@ -112,7 +112,8 @@ proc makeCropTable(gifTag: PXmlNode): PXmlNode =
   let positionStyle = if dims.x != "0" or dims.y != "0": 
                         "background-position:" & dims.x & " " & dims.y 
                       else: "" 
-  result = <>table(width=dims.w, height=dims.h, background=makeGifFilename(gifTag),
+  result = <>table(width=dims.w, height=dims.h, 
+                   background=makeGifFilename(gifTag, '/'),
                    style="background-repeat:no-repeat;" & positionStyle, 
                    <>tr(<>td())) 
 
@@ -156,7 +157,7 @@ proc makeComplexShapeTable(tag: PXmlNode, configurations): PXmlNode =
 proc convertTagGif*(tag: PXmlNode): PXmlNode {.procvar.} =
   if tag.attrsLen == 0: return <>img()
   if not tag.attrExists("crop"):
-    result = <>img(src=makeGifFilename(tag))
+    result = <>img(src=makeGifFilename(tag, '/'))
   else: result = makeCropTable(tag)
   result.wrapInDiv(madeFrom=tag)
 
@@ -285,7 +286,7 @@ proc generateGifTransformCommand(gifTag: PXmlNode, projPath: string): string =
   ## Create the ImageMagick commands to generate gif transformations.
   proc fileNewerThan(f1, f2: string): bool =
     f1.getLastModificationTime() > f2.getLastModificationTime()
-  let filename = projPath / makeGifFilename(gifTag)
+  let filename = projPath / makeGifFilename(gifTag, DirSep)
   let filenameNoTrs = projPath / gifTag.attr("name") & ".gif"
   if existsFile(filename) and fileNewerThan(filename, filenameNoTrs): 
     return ""
@@ -315,13 +316,13 @@ proc transformAndOutputGifs(gifs: seq[PXmlNode], projPath: string): void =
   for g in gifs: 
     let command = g.generateGifTransformCommand(projPath)
     if command != "": 
-      echo ("Generating " & (projPath / g.makeGifFilename()))
+      echo ("Generating " & (projPath / makeGifFilename(g, DirSep)))
       trsCommands.add(command)
   discard execProcesses(trsCommands)
 
 proc deleteUnusedGeneratedGifs(gifsUsed: seq[PXmlNode], projPath: string): void = 
-  let usedGifFilenames = gifsUsed.mapIt(string, projPath / it.makeGifFilename())
-  for f in walkFiles(projPath / generatedGifFolder & "/*.gif"):
+  let usedGifFilenames = gifsUsed.mapIt(string, projPath / makeGifFilename(it, DirSep))
+  for f in walkFiles(projPath / generatedGifFolder / "*.gif"):
     if f notin usedGifFilenames:
        removeFile(f)
 

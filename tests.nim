@@ -204,6 +204,16 @@ convTest "convert down-pointing right triangle to table", convertTagRtri,
   </div> 
   """
 
+convTest "convert vertical bowtie to table", convertTagBowtie,
+  """
+  <bowtie type="vertical" color="grey" size="75" />
+
+  <table style="empty-cells:show;border-style:solid;border-color:grey transparent grey transparent;" 
+    bgcolor="transparent" border="75" cellpadding="0" cellspacing="0" height="0" width="0">
+  <tbody><tr><td style="border-style:none;"></td></tr></tbody>
+  </table>
+  """
+
 test "make gif filename when gif has a transformation":
   let tag = <>gif(name="source", x="10", y="10", scale="2")
   check makeGifFilename(tag) == "generated/source-scale2.gif"

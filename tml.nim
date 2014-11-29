@@ -116,21 +116,40 @@ proc makeCropTable(gifTag: PXmlNode): PXmlNode =
                    style="background-repeat:no-repeat;" & positionStyle, 
                    <>tr(<>td())) 
 
-proc makeShapeTable(tag: PXmlNode, configurations): PXmlNode =
+const commonShapeTableStyle = "empty-cells:show;border-style:solid;"
+
+proc makeColorStyleInstance(config, color: string): any =
+  result = config.replace("tr", "transparent") % color
+
+proc makeSimpleShapeTable(tag: PXmlNode, configurations): PXmlNode =
   ## Make an initial table for displaying shapes. 
   ## "configurations" maps type attributes to border-color attributes.
-  let tbody = <>tbody(<>tr(<>td(style="border-style:none;"))) 
-  let commonTableStyle = "empty-cells:show;border-style:solid;"
-  let shapeType  = tag.attr("type")
-  let shapeColor = tag.attr("color", default="white")
-  let shapeSize  = tag.attr("size",  default="100")
+  proc makeShapeColorStyle(tag: PXmlNode, configurations): string = 
+    let shapeType = tag.attr("type")
+    if not configurations.hasKey(shapeType):
+      configurations[shapeType] = "tr tr tr tr" 
+    let shapeColor = tag.attr("color", default="white")
+    let colorStyle = configurations[shapeType].makeColorStyleInstance(shapeColor)
+    result = commonShapeTableStyle & "border-color:" & colorStyle & ";"
+  <>table(<>tbody(<>tr(<>td(style="border-style:none;"))), 
+          border=tag.attr("size", default="100"),
+          style=makeShapeColorStyle(tag, configurations),
+          bgcolor="transparent", cellpadding="0", cellspacing="0", 
+          height="0", width="0")
+
+proc makeComplexShapeTable(tag: PXmlNode, configurations): PXmlNode =
+  var shapeType = tag.attr("type")
+  if shapeType == "": shapeType = "none"
   if not configurations.hasKey(shapeType):
-    configurations[shapeType] = "transparent transparent transparent transparent" 
-  let colorStyle = configurations[shapeType] % shapeColor 
-  result = <>table(tbody, border = shapeSize,
-                   style = commonTableStyle & "border-color:" & colorStyle & ";",
-                   bgcolor = "transparent", cellpadding = "0", cellspacing = "0", 
-                   height = "0", width = "0")
+    configurations[shapeType] = "tr tr tr tr, tr tr tr tr"
+  let shapeColor = tag.attr("color", default="white")
+  let colorStyles = configurations[shapeType].makeColorStyleInstance(shapeColor).split(", ")
+  let shapeSize = tag.attr("size", default="100") 
+  let fullStyleTemplate = commonShapeTableStyle & "border-color:$1;border-width:$2;"
+  let fullStyles = (fullStyleTemplate % [colorStyles[0], shapeSize], 
+                    fullStyleTemplate % [colorStyles[1], shapeSize])  
+  <>table(bgcolor="transparent", border="0", cellpadding="0", cellspacing="0",
+          <>tbody(<>tr(<>td(style=fullStyles[0]), <>td(style=fullStyles[1]))))
 
 
 
@@ -157,34 +176,86 @@ proc convertTagPos*(tag: PXmlNode): PXmlNode {.procvar.} =
   if result.tag == "": return newText("")
   for i in tag.items: result.add(i)
 
+proc convertTagRect*(tag: PXmlNode): PXmlNode {.procvar.} =
+  result = <>table(<>tr(<>td()), border="0", 
+                   bgcolor=tag.attr("color", default="white"),
+                   width=tag.attr("w", default="0"),
+                   height=tag.attr("h", default="0"))
+  result.wrapInDiv(madeFrom=tag)
+
 proc convertTagItri*(tag: PXmlNode): PXmlNode {.procvar.} =
-  result = makeShapeTable(tag, configurations=newTable({
-    "up":    "transparent transparent $1 transparent",
-    "down":  "$1 transparent transparent transparent",
-    "left":  "transparent $1 transparent transparent",
-    "right": "transparent transparent transparent $1"}))
+  result = makeSimpleShapeTable(tag, configurations=newTable({
+    "up":    "tr tr $1 tr",
+    "down":  "$1 tr tr tr",
+    "left":  "tr $1 tr tr",
+    "right": "tr tr tr $1"}))
   result.wrapInDiv(madeFrom=tag)
 
 proc convertTagRtri*(tag: PXmlNode): PXmlNode {.procvar.} =
-  result = makeShapeTable(tag, configurations=newTable({
-    "up left":    "$1 transparent transparent $1",
-    "up right":   "$1 $1 transparent transparent",
-    "down left":  "transparent transparent $1 $1",
-    "down right": "transparent $1 $1 transparent"}))
+  result = makeSimpleShapeTable(tag, configurations=newTable({
+    "up left":    "$1 tr tr $1",
+    "up right":   "$1 $1 tr tr",
+    "down left":  "tr tr $1 $1",
+    "down right": "tr $1 $1 tr"}))
   result.wrapInDiv(madeFrom=tag) 
+
+proc convertTagTrap*(tag: PXmlNode): PXmlNode {.procvar.} =
+  result = makeSimpleShapeTable(tag, configurations=newTable({
+    "up":    "tr tr $1 tr",
+    "down":  "$1 tr tr tr",
+    "left":  "tr $1 tr tr",
+    "right": "tr tr tr $1"}))
+  if tag.attr("type") in ["up", "down"]:
+    result.attrs["width"]  = tag.attr("w")
+    result.attrs["border"] = tag.attr("h")
+  elif tag.attr("type") in ["left", "right"]: 
+    result.attrs["border"] = tag.attr("w")
+    result.attrs["height"] = tag.attr("h")
+  result.wrapInDiv(madeFrom=tag)  
+
+proc convertTagBowtie*(tag: PXmlNode): PXmlNode {.procvar.} =
+  result = makeSimpleShapeTable(tag, configurations=newTable({
+    "vertical":   "$1 tr $1 tr",
+    "horizontal": "tr $1 tr $1"}))
+  result.wrapInDiv(madeFrom=tag)
+
+proc convertTagPac*(tag: PXmlNode): PXmlNode {.procvar.} =
+  result = makeSimpleShapeTable(tag, configurations=newTable({
+    "up":    "tr $1 $1 $1",
+    "down":  "$1 $1 tr $1",
+    "left":  "$1 $1 $1 tr",
+    "right": "$1 tr $1 $1"}))
+  result.wrapInDiv(madeFrom=tag)
+
+proc convertTagPgm*(tag: PXmlNode): PXmlNode {.procvar.} =
+  result = makeComplexShapeTable(tag, configurations=newTable({
+    "left":  ("$1 $1 tr tr, tr tr $1 $1"),
+    "right": ("tr $1 $1 tr, $1 tr tr $1")}))
+  result.wrapInDiv(madeFrom=tag)
+
+proc convertTagRhom*(tag: PXmlNode): PXmlNode {.procvar.} =
+  result = makeComplexShapeTable(tag, configurations=newTable({
+    "none": ("tr $1 tr tr, tr tr tr $1")}))
+  result.wrapInDiv(madeFrom=tag)
 
 proc dummyConvert(tag: PXmlNode): PXmlNode {.procvar.} = tag
 
-const CONVERSION_FUNCTIONS = {
-  "gif":  convertTagGif,
-  "dlg":  convertTagDlg,
-  "pos":  convertTagPos,
-  "itri": convertTagItri,
-  "rtri": convertTagRtri
+const conversionFunctions = {
+  "gif":     convertTagGif,
+  "dlg":     convertTagDlg,
+  "pos":     convertTagPos,
+  "rect":    convertTagRect,
+  "itri":    convertTagItri,
+  "rtri":    convertTagRtri,
+  "trap":    convertTagTrap,
+  "bowtie":  convertTagBowtie,
+  "pac":     convertTagPac,
+  "pgm":     convertTagPgm,
+  "rhom":    convertTagRhom
 }
 
 proc conversionFunction(tag: string): proc(tag: PXmlNode): PXmlNode =
-  for c in CONVERSION_FUNCTIONS:
+  for c in conversionFunctions:
     if c[0] == tag: return c[1] 
   return dummyConvert
 
@@ -219,7 +290,7 @@ proc generateGifTransformCommand(gifTag: PXmlNode, projPath: string): string =
   let trsAttrs = getGifTransformationAttrs(gifTag)
   var trsArgs = " -filter point -background \"rgba(0,0,0,0)\" "
   if trsAttrs.hasKey("prescale"):
-    trsArgs.add(" -resize " & trsAttrs["prescale"] & " +repage")
+   trsArgs.add(" -resize " & trsAttrs["prescale"] & " +repage")
   if trsAttrs.hasKey("flip"):
     if 'x' in trsAttrs["flip"]: trsArgs.add(" -flop")
     if 'y' in trsAttrs["flip"]: trsArgs.add(" -flip") 

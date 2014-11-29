@@ -1,0 +1,43 @@
+<tml>
+<head><title>Noise</title></head>
+<body bgcolor="black">
+
+<dlg x="140" y="140" w="210" font="Comic Sans MS, 3px">
+tisTree Markup Language!
+<rtri type="up left" x="90" y="30" size="11" />
+</dlg>
+
+<rect x="500" y="600" w="200" h="200" color="darkgreen" />
+<rtri type="down left" x="700" y="600" size="100" color="green" />
+<rtri type="up left" x="800" y="600" size="100" color="green" />
+<itri type="up" x="900" y="600" size="100" color="green" />
+<itri type="left" x="900" y="500" size="100" color="green" />
+<trap type="down" x="500" y="750" w="200" h="50" color="green" />
+<trap type="left" x="360" y="600" w="70" h="200" color="green" />
+<bowtie type="horizontal" x="900" y="400" size="100" color="darkgreen" />
+<pac type="right" x="700" y="400" size="100" color="darkgreen" />
+<pgm type="left" x="700" y="200" size="100" color="green" />
+<rhom x="700" y="300" size="100" color="green" />
+
+<pos x="450" y="260"><font face="Comic Sans MS" color="white">Yeah</font></pos>
+
+<gif name="snowman" x="140" y="245" scale="25%" rotate="160" flip="y" brightness="5" hue="230" delay="1" />
+<gif name="snowman" x="150" y="200" scale="50%" rotate="120" flip="y" brightness="10" hue="190" delay="2" />
+<gif name="snowman" x="200" y="200" scale="100%" rotate="90" flip="y" brightness="25" hue="150" delay="4" />
+<gif name="snowman" x="200" y="200" scale="150%" rotate="40" flip="y" brightness="50" delay="8" />
+<gif name="snowman" x="200" y="300" scale="200%" flip="y" hue="120" delay="16" />
+
+<pos x="410" y="-115">
+<gif name="icecreamman" x="140" y="245" scale="25%" rotate="160" flip="y" brightness="5" hue="230" delay="9" />
+<gif name="icecreamman" x="150" y="200" scale="50%" rotate="120" flip="y" brightness="10" hue="190" delay="15" />
+<gif name="icecreamman" x="200" y="200" scale="100%" rotate="90" flip="y" brightness="25" hue="150" delay="30" />
+<gif name="icecreamman" x="200" y="200" scale="150%" rotate="40" flip="y" brightness="50" delay="60" />
+<gif name="icecreamman" x="200" y="300" scale="200%" flip="y" hue="120" delay="120" />
+</pos>
+
+<gif name="icecreamman" x="900" y="200" scale="200%" crop="80px 80px 30px 30px" />
+
+<gif name="tistree" x="200" y="500" prescale="200%" rotate="30" style="background-color:white" />
+
+</body>
+</tml>

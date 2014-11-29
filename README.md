@@ -11,7 +11,7 @@ A markup language for making tisTree comics: http://sbboard.com/tistree/
 * Transformation attributes generate new gifs, which are linked to in the generated html. Since it uses ImageMagick, the arguments mostly resemble ImageMagick arguments:
   * _prescale_ scales the image by a percentage. This occurs before any other transformation (to avoid blockiness when it's not desired)
   * _flip_ flips the image on the x or y axes. Valid inputs are "x", "y", and "xy"
-  * _delay_ changes the delay between animation frames. Valid inputs are in the form of a single number (the delay in "ticks"), or the form a__x__b (where _a_ is the number of ticks delay and _b_ is the number of ticks in a second)
+  * _delay_ changes the delay between animation frames. Valid inputs are in the form of a single number (the delay in "ticks"), or the form axb (where _a_ is the number of ticks delay and _b_ is the number of ticks in a second)
   * _rotate_ rotates the image
   * _brightness_ sets the brightness of the image as a percentage
   * _saturation_ sets the saturation

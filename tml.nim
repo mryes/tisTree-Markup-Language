@@ -180,7 +180,9 @@ proc convertTagRect*(tag: PXmlNode): PXmlNode {.procvar.} =
   result = <>table(<>tr(<>td()), border="0", 
                    bgcolor=tag.attr("color", default="white"),
                    width=tag.attr("w", default="0"),
-                   height=tag.attr("h", default="0"))
+                   height=tag.attr("h", default="0"),
+                   style=tag.attr("style"))
+  tag.attrs["style"] = "" # to keep it from applying to div
   result.wrapInDiv(madeFrom=tag)
 
 proc convertTagItri*(tag: PXmlNode): PXmlNode {.procvar.} =

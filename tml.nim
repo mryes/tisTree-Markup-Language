@@ -1,5 +1,5 @@
-import os, osproc, xmltree, htmlparser, sequtils, streams, strutils, 
-       strtabs, algorithm, parseutils, times, tables
+import os, osproc, sequtils, streams, strutils, strtabs, algorithm, parseutils, 
+       times, tables, future, lib.htmlparser, lib.xmltree
 
 
  
@@ -254,7 +254,7 @@ const conversionFunctions = {
   "rhom":    convertTagRhom
 }
 
-proc conversionFunction(tag: string): proc(tag: PXmlNode): PXmlNode =
+proc conversionFunction(tag): (PXmlNode) -> PXmlNode =
   for c in conversionFunctions:
     if c[0] == tag: return c[1] 
   return dummyConvert

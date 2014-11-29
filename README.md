@@ -1,7 +1,7 @@
 tisTree Markup Language
 =======================
 
-A markup language for making tisTree comics: http://sbboard.com/tistree/
+This is a superset of HTML with features that make it easier to create the common things required in a tisTree comic. See the examples directory for a demonstration of how it works and what it generates.
 
 ### __Reference__
 ##### __gif__ attributes
